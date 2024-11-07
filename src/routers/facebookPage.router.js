@@ -6,7 +6,8 @@ const {
     getFacebookPages,
     getFacebookPage,
     getFacebookPagePosts,
-    createPagesPost
+    createPagesPost,
+    createPagePost
 } = require("../controllers/facebookPage.controller");
 
 // Configure multer for file uploads
@@ -18,6 +19,7 @@ router.get("/:pageId", verifyToken, getFacebookPage);
 router.get("/:pageId/posts", verifyToken, getFacebookPagePosts);
 
 router.post("/facebook-page-login", verifyToken, facebookPageLogin);
+router.post("/create-page-post", verifyToken, upload.single('mediaFile'), createPagePost);
 router.post("/create-pages-post", verifyToken, upload.single('mediaFile'), createPagesPost);
 
 module.exports = router;

@@ -239,11 +239,8 @@ exports.getFacebookPagePosts = async (req, res, next) => {
 // Single post for Facebook page 
 exports.createPagePost = async (req, res, next) => {
     try {
-        const { message, link, mediaType } = req.body; // Getting message and media type from the request body
+        const { pageId, pageAccessToken, message, link, mediaType } = req.body; // Get pageId, pageAccessToken, message, link, and media type from request body
         const mediaFile = req.file; // Getting uploaded file
-
-        const pageId = '';
-        const accessToken = '';
 
         // Check for valid media types and handle accordingly
         if (mediaType === 'video') {
@@ -254,7 +251,7 @@ exports.createPagePost = async (req, res, next) => {
 
             // Create a FormData instance
             const formData = new FormData();
-            formData.append('access_token', accessToken);
+            formData.append('access_token', pageAccessToken);
             formData.append('description', message);
             formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname }); // Attach the video file
 
@@ -285,7 +282,7 @@ exports.createPagePost = async (req, res, next) => {
             formData.append('message', message);
             formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
 
-            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${accessToken}`;
+            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${pageAccessToken}`;
             const response = await axios.post(facebookUrl, formData, {
                 headers: {
                     ...formData.getHeaders(),
@@ -305,7 +302,7 @@ exports.createPagePost = async (req, res, next) => {
             }
 
             // Handle text posting
-            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${accessToken}`;
+            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
             const response = await axios.post(facebookUrl, {
                 message,
                 link
@@ -349,7 +346,7 @@ exports.createPagesPost = async (req, res, next) => {
                 if (mediaType === 'video') {
                     // Ensure a file is uploaded for videos
                     if (!mediaFile) {
-                        throw createError(400, 'Video file is required for Video media type!');
+                        throw createError(400, 'Video file is required to post Video!');
                     }
 
                     // Create a FormData instance for video
@@ -369,7 +366,7 @@ exports.createPagesPost = async (req, res, next) => {
                 } else if (mediaType === 'photo') {
                     // Ensure a file is uploaded for photos
                     if (!mediaFile) {
-                        throw createError(400, 'Photo file is required for Photo media type!');
+                        throw createError(400, 'Photo file is required to post Photo!');
                     }
 
                     // Create a FormData instance for photo
@@ -388,7 +385,7 @@ exports.createPagesPost = async (req, res, next) => {
                 } else if (mediaType === 'text') {
                     // Ensure message or link is provided for text posts
                     if (!message && !link) {
-                        throw createError(400, 'Message or Link field is required for Text media type!');
+                        throw createError(400, 'Message or Link field is required to post!');
                     }
 
                     const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
@@ -409,22 +406,19 @@ exports.createPagesPost = async (req, res, next) => {
                     data: response.data,
                 });
             } catch (err) {
-                // Collect error result for this page
-                results.push({
-                    pageId,
-                    status: 'error',
-                    message: err.message || 'An error occurred while posting',
-                });
+                // Immediately throw the error if any page post fails, stopping further actions
+                throw createError(500, `${err.message}`);
+                // throw createError(500, `Error posting to page ${pageId}: ${err.message}`); // for debigging
             }
         }
 
-        // Send the consolidated response
+        // Send success response if all posts are successful
         successResponse(res, {
             status: 200,
-            message: 'Posting completed',
+            message: 'Posting completed successfully',
             payload: { results },
         });
     } catch (err) {
-        next(err);
+        next(err); // Pass error to error-handling middleware
     }
-};
+}

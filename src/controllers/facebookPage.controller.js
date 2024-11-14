@@ -236,6 +236,39 @@ exports.getFacebookPagePosts = async (req, res, next) => {
     }
 };
 
+exports.getFacebookPageInsights = async (req, res, next) => {
+    try {
+        const pageId = req.params.pageId;
+
+        const facebookPage = await findFacebookPageById(pageId);
+
+        if (!facebookPage) {
+            throw createError(400, 'Facebook page not found!');
+        }
+
+        // Fetch the user's posts
+        const response = await axios.get(
+            `https://graph.facebook.com/v21.0/${pageId}/insights`, {
+            params: {
+                access_token: facebookPage.pageAccessToken,
+                metric: 'page_impressions,page_impressions_unique,page_post_engagements,page_views_total,page_video_views,page_fan_adds,page_fan_removes'
+            }
+        });
+
+        const insights = response.data.data;
+        const paging = response.data.paging;
+
+        successResponse(res, {
+            status: 200,
+            message: "Page insights returned successfully!",
+            payload: { insights, paging }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
 // Single post for Facebook page 
 exports.createPagePost = async (req, res, next) => {
     try {

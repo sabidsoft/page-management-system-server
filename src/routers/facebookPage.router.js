@@ -7,7 +7,8 @@ const {
     getFacebookPage,
     getFacebookPagePosts,
     createPagesPost,
-    createPagePost
+    createPagePost,
+    getFacebookPageInsights
 } = require("../controllers/facebookPage.controller");
 
 // Configure multer for file uploads
@@ -17,6 +18,7 @@ const upload = multer({ storage: storage });
 router.get("/", verifyToken, getFacebookPages);
 router.get("/:pageId", verifyToken, getFacebookPage);
 router.get("/:pageId/posts", verifyToken, getFacebookPagePosts);
+router.get("/:pageId/insights", verifyToken, getFacebookPageInsights);
 
 router.post("/facebook-page-login", verifyToken, facebookPageLogin);
 router.post("/create-page-post", verifyToken, upload.single('mediaFile'), createPagePost);

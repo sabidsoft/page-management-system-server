@@ -214,7 +214,7 @@ exports.getFacebookPagePosts = async (req, res, next) => {
             throw createError(400, 'Facebook page not found!');
         }
 
-        // Fetch the user's posts
+        // Fetch the page's posts
         const response = await axios.get(
             `https://graph.facebook.com/v21.0/${pageId}/posts`, {
             params: {
@@ -236,6 +236,37 @@ exports.getFacebookPagePosts = async (req, res, next) => {
     }
 };
 
+exports.getFacebookPageAbout = async (req, res, next) => {
+    try {
+        const pageId = req.params.pageId;
+
+        const facebookPage = await findFacebookPageById(pageId);
+
+        if (!facebookPage) {
+            throw createError(400, 'Facebook page not found!');
+        }
+
+        // Fetch the page's basic info for page about
+        const response = await axios.get(
+            `https://graph.facebook.com/v21.0/${pageId}`, {
+            params: {
+                access_token: facebookPage.pageAccessToken,
+                fields: 'id,name,about,fan_count,followers_count,category,link,website,location,is_published,is_verified,cover,picture'
+            }
+        });
+
+        const pageInfo = response.data;
+
+        successResponse(res, {
+            status: 200,
+            message: "Page's basic info returned by Facebook ID",
+            payload: { pageInfo }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.getFacebookPageInsights = async (req, res, next) => {
     try {
         const pageId = req.params.pageId;
@@ -246,7 +277,7 @@ exports.getFacebookPageInsights = async (req, res, next) => {
             throw createError(400, 'Facebook page not found!');
         }
 
-        // Fetch the user's posts
+        // Fetch the page's insights
         const response = await axios.get(
             `https://graph.facebook.com/v21.0/${pageId}/insights`, {
             params: {

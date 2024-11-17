@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // application level middlewares
-app.use(limiter);
+// app.use(limiter); // Ignoring it for too many request (I need too many request in this project)
 app.use(helmet());
 app.use(cors());
 app.use(express.json());

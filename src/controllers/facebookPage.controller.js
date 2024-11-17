@@ -299,6 +299,45 @@ exports.getFacebookPageInsights = async (req, res, next) => {
     }
 };
 
+exports.getFacebookPagePostInsights = async (req, res, next) => {
+    try {
+        const { pageId, postId } = req.params;
+
+        if (!pageId) {
+            throw createError(400, 'Page ID is required!');
+        }
+
+        if (!postId) {
+            throw createError(400, 'Post ID is required!');
+        }
+
+        const facebookPage = await findFacebookPageById(pageId);
+
+        if (!facebookPage) {
+            throw createError(400, 'Facebook page not found!');
+        }
+
+        // Fetch the page post insights
+        const response = await axios.get(
+            `https://graph.facebook.com/v21.0/${postId}/insights`, {
+            params: {
+                access_token: facebookPage.pageAccessToken,
+                metric: 'post_impressions,post_impressions_unique,post_clicks,post_clicks_by_type,post_video_views,post_video_avg_time_watched,post_reactions_by_type_total,post_reactions_like_total,post_reactions_love_total,post_reactions_wow_total,post_reactions_haha_total,post_reactions_sorry_total,post_reactions_anger_total'
+            }
+        });
+
+        const insights = response.data?.data || [];
+        const paging = response.data?.paging || {};
+
+        successResponse(res, {
+            status: 200,
+            message: "Post insight returned by post ID",
+            payload: { insights, paging }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
 
 // Single post for Facebook page 
 exports.createPagePost = async (req, res, next) => {

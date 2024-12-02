@@ -2,7 +2,7 @@ const router = require("express").Router();
 const multer = require('multer');
 const verifyToken = require("../middlewares/verifyToken");
 const {
-    facebookPageLogin,
+    facebookLogin,
     getFacebookPages,
     getFacebookPage,
     getFacebookPagePosts,
@@ -10,7 +10,7 @@ const {
     createPagePost,
     getFacebookPageInsights,
     getFacebookPageAbout,
-    getFacebookPagePostInsights
+    getFacebookPagePostInsights,
 } = require("../controllers/facebookPage.controller");
 
 // Configure multer for file uploads
@@ -24,7 +24,7 @@ router.get("/:pageId/about", verifyToken, getFacebookPageAbout);
 router.get("/:pageId/insights", verifyToken, getFacebookPageInsights);
 router.get("/:pageId/posts/:postId/insights", verifyToken, getFacebookPagePostInsights);
 
-router.post("/facebook-page-login", verifyToken, facebookPageLogin);
+router.post("/facebook-login", verifyToken, facebookLogin);
 router.post("/create-page-post", verifyToken, upload.single('mediaFile'), createPagePost);
 router.post("/create-pages-post", verifyToken, upload.single('mediaFile'), createPagesPost);
 

@@ -18,6 +18,11 @@ const adminSchema = new Schema({
         lowercase: true,
     },
 
+    profilePicture: {
+        type: String,
+        default: '',
+    },
+
     password: {
         type: String,
         required: true,
@@ -26,14 +31,24 @@ const adminSchema = new Schema({
 
     role: {
         type: String,
-        enum: ['admin', 'moderator', 'editor'],
-        default: 'admin',
+        required: true,
+        enum: ['Super Admin', 'Detachment Admin', 'District Admin'],
     },
 
-    // profilePicture: {
-    //     type: String,
-    //     required: true,
-    // },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+
+    isLoggedIn: {
+        type: Boolean,
+        default: true,
+    },
+
+    lastLogin: {
+        type: Date,
+        default: Date.now,
+    },
 
     resetPasswordToken: {
         type: String,

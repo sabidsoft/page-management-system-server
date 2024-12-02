@@ -4,18 +4,18 @@ const createError = require("http-errors");
 const { successResponse } = require("../utils/response");
 const {
     upsertFacebookPageService,
-    getFacebookPagesService,
-    findFacebookPageById
+    findFacebookPageById,
+    getPagesByFilter
 } = require('../services/facebookPage.service');
 
 // // With facebook page profile picture
-exports.facebookPageLogin = async (req, res, next) => {
+exports.facebookLogin = async (req, res, next) => {
     try {
-        const { userAccessToken } = req.body;
+        const { userAccessToken, detachmentName, districtName } = req.body;
 
-        if (!userAccessToken) {
-            throw createError(400, 'User access token is required!');
-        }
+        if (!userAccessToken) throw createError(400, 'User access token is required!');
+        if (!detachmentName) throw createError(400, 'Detachment name is required!');
+        if (!districtName) throw createError(400, 'District name is required!');
 
         // Exchange the short-lived user access token for a long-lived user access token
         let longLivedUserAccessToken;
@@ -75,7 +75,9 @@ exports.facebookPageLogin = async (req, res, next) => {
                     pageName: page.name,
                     pageCategory: page.category,
                     pageAccessToken: page.access_token,
-                    pageProfilePicture: pageProfilePictureUrl
+                    pageProfilePicture: pageProfilePictureUrl,
+                    detachmentName,
+                    districtName,
                 });
 
                 upsertedPages.push(updatedPage);
@@ -170,9 +172,200 @@ exports.facebookPageLogin = async (req, res, next) => {
 //     }
 // };
 
+// Single post for Facebook page 
+
+exports.createPagePost = async (req, res, next) => {
+    try {
+        const { pageId, pageAccessToken, message, link, mediaType } = req.body; // Get pageId, pageAccessToken, message, link, and media type from request body
+        const mediaFile = req.file; // Getting uploaded file
+
+        // Check for valid media types and handle accordingly
+        if (mediaType === 'video') {
+            // Ensure a file is uploaded for videos
+            if (!mediaFile) {
+                throw createError(400, 'Video file is required for Video media type!');
+            }
+
+            // Create a FormData instance
+            const formData = new FormData();
+            formData.append('access_token', pageAccessToken);
+            formData.append('description', message);
+            formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname }); // Attach the video file
+
+            // Define the Facebook API URL for video posting
+            const facebookUrl = `https://graph-video.facebook.com/v21.0/${pageId}/videos`;
+
+            // Make the API call for video uploads
+            const response = await axios.post(facebookUrl, formData, {
+                headers: {
+                    ...formData.getHeaders(),
+                },
+            });
+
+            const data = response.data;
+
+            successResponse(res, {
+                status: 200,
+                message: "Posted successfully",
+                payload: { data }
+            });
+        } else if (mediaType === 'photo') {
+            // Handle photo uploads
+            if (!mediaFile) {
+                throw createError(400, 'Photo file is required for Photo media type!');
+            }
+
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
+
+            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${pageAccessToken}`;
+            const response = await axios.post(facebookUrl, formData, {
+                headers: {
+                    ...formData.getHeaders(),
+                },
+            });
+
+            const data = response.data;
+
+            successResponse(res, {
+                status: 200,
+                message: "Posted successfully",
+                payload: { data }
+            });
+        } else if (mediaType === 'text') {
+            if (!message && !link) {
+                throw createError(400, 'Message or Link field is required for Text media type!');
+            }
+
+            // Handle text posting
+            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
+            const response = await axios.post(facebookUrl, {
+                message,
+                link
+            });
+
+            const data = response.data;
+
+            successResponse(res, {
+                status: 200,
+                message: "Posted successfully!",
+                payload: { data }
+            });
+        } else {
+            throw createError(400, 'Invalid media type!');
+        }
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Multiple post for Facebook pages 
+exports.createPagesPost = async (req, res, next) => {
+    try {
+        const { message, link, mediaType, fieldName, fieldValue } = req.body;
+        const mediaFile = req.file; // Get uploaded file
+
+        // Dynamically fetch pages based on fieldName and fieldValue using a generic filter
+        const facebookPages = await getPagesByFilter(fieldName, fieldValue);
+
+        // Ensure there are pages to post
+        if (!facebookPages || facebookPages.length === 0) {
+            throw createError(400, 'No Facebook page found!');
+        }
+
+        const results = []; // Array to hold results of each post attempt
+
+        for (const page of facebookPages) {
+            const { pageId, pageAccessToken } = page;
+            try {
+                let response;
+                if (mediaType === 'video') {
+                    // Ensure a file is uploaded for videos
+                    if (!mediaFile) {
+                        throw createError(400, 'Video file is required to post Video!');
+                    }
+
+                    // Create a FormData instance for video
+                    const formData = new FormData();
+                    formData.append('access_token', pageAccessToken);
+                    formData.append('description', message);
+                    formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
+
+                    const facebookUrl = `https://graph-video.facebook.com/v21.0/${pageId}/videos`;
+
+                    // Make the API call for video uploads
+                    response = await axios.post(facebookUrl, formData, {
+                        headers: {
+                            ...formData.getHeaders(),
+                        },
+                    });
+                } else if (mediaType === 'photo') {
+                    // Ensure a file is uploaded for photos
+                    if (!mediaFile) {
+                        throw createError(400, 'Photo file is required to post Photo!');
+                    }
+
+                    // Create a FormData instance for photo
+                    const formData = new FormData();
+                    formData.append('message', message);
+                    formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
+
+                    const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${pageAccessToken}`;
+
+                    // Make the API call for photo uploads
+                    response = await axios.post(facebookUrl, formData, {
+                        headers: {
+                            ...formData.getHeaders(),
+                        },
+                    });
+                } else if (mediaType === 'text') {
+                    // Ensure message or link is provided for text posts
+                    if (!message && !link) {
+                        throw createError(400, 'Message or Link field is required to post!');
+                    }
+
+                    const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
+
+                    // Make the API call for text posting
+                    response = await axios.post(facebookUrl, {
+                        message,
+                        link,
+                    });
+                } else {
+                    throw createError(400, 'Invalid media type!');
+                }
+
+                // Collect successful result
+                results.push({
+                    pageId,
+                    status: 'success',
+                    data: response.data,
+                });
+            } catch (err) {
+                // Immediately throw the error if any page post fails, stopping further actions
+                // console.error(`Error posting to page ${pageId}:`, err.response?.data || err.message); // for debigging
+                throw createError(500, `${err.message}`);
+            }
+        }
+
+        // Send success response if all posts are successful
+        successResponse(res, {
+            status: 200,
+            message: 'Posting completed successfully',
+            payload: { results },
+        });
+    } catch (err) {
+        next(err); // Pass error to error-handling middleware
+    }
+}
+
 exports.getFacebookPages = async (req, res, next) => {
     try {
-        const facebookPages = await getFacebookPagesService();
+        const { fieldName, fieldValue } = req.query; // Extract query params
+
+        // Fetch pages based on the provided filter
+        const facebookPages = await getPagesByFilter(fieldName, fieldValue);
 
         successResponse(res, {
             status: 200,
@@ -338,190 +531,3 @@ exports.getFacebookPagePostInsights = async (req, res, next) => {
         next(err);
     }
 };
-
-// Single post for Facebook page 
-exports.createPagePost = async (req, res, next) => {
-    try {
-        const { pageId, pageAccessToken, message, link, mediaType } = req.body; // Get pageId, pageAccessToken, message, link, and media type from request body
-        const mediaFile = req.file; // Getting uploaded file
-
-        // Check for valid media types and handle accordingly
-        if (mediaType === 'video') {
-            // Ensure a file is uploaded for videos
-            if (!mediaFile) {
-                throw createError(400, 'Video file is required for Video media type!');
-            }
-
-            // Create a FormData instance
-            const formData = new FormData();
-            formData.append('access_token', pageAccessToken);
-            formData.append('description', message);
-            formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname }); // Attach the video file
-
-            // Define the Facebook API URL for video posting
-            const facebookUrl = `https://graph-video.facebook.com/v21.0/${pageId}/videos`;
-
-            // Make the API call for video uploads
-            const response = await axios.post(facebookUrl, formData, {
-                headers: {
-                    ...formData.getHeaders(),
-                },
-            });
-
-            const data = response.data;
-
-            successResponse(res, {
-                status: 200,
-                message: "Posted successfully",
-                payload: { data }
-            });
-        } else if (mediaType === 'photo') {
-            // Handle photo uploads
-            if (!mediaFile) {
-                throw createError(400, 'Photo file is required for Photo media type!');
-            }
-
-            const formData = new FormData();
-            formData.append('message', message);
-            formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
-
-            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${pageAccessToken}`;
-            const response = await axios.post(facebookUrl, formData, {
-                headers: {
-                    ...formData.getHeaders(),
-                },
-            });
-
-            const data = response.data;
-
-            successResponse(res, {
-                status: 200,
-                message: "Posted successfully",
-                payload: { data }
-            });
-        } else if (mediaType === 'text') {
-            if (!message && !link) {
-                throw createError(400, 'Message or Link field is required for Text media type!');
-            }
-
-            // Handle text posting
-            const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
-            const response = await axios.post(facebookUrl, {
-                message,
-                link
-            });
-
-            const data = response.data;
-
-            successResponse(res, {
-                status: 200,
-                message: "Posted successfully!",
-                payload: { data }
-            });
-        } else {
-            throw createError(400, 'Invalid media type!');
-        }
-    } catch (err) {
-        next(err);
-    }
-};
-
-// Multiple post for Facebook pages 
-exports.createPagesPost = async (req, res, next) => {
-    try {
-        const { message, link, mediaType } = req.body; // Get message, link, and media type from request body
-        const mediaFile = req.file; // Get uploaded file
-
-        // Fetch the array of Facebook pages
-        const facebookPages = await getFacebookPagesService();
-
-        // Ensure there are pages to post
-        if (!facebookPages || facebookPages.length === 0) {
-            throw createError(400, 'No Facebook pages found!');
-        }
-
-        const results = []; // Array to hold results of each post attempt
-
-        for (const page of facebookPages) {
-            const { pageId, pageAccessToken } = page;
-            try {
-                let response;
-                if (mediaType === 'video') {
-                    // Ensure a file is uploaded for videos
-                    if (!mediaFile) {
-                        throw createError(400, 'Video file is required to post Video!');
-                    }
-
-                    // Create a FormData instance for video
-                    const formData = new FormData();
-                    formData.append('access_token', pageAccessToken);
-                    formData.append('description', message);
-                    formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
-
-                    const facebookUrl = `https://graph-video.facebook.com/v21.0/${pageId}/videos`;
-
-                    // Make the API call for video uploads
-                    response = await axios.post(facebookUrl, formData, {
-                        headers: {
-                            ...formData.getHeaders(),
-                        },
-                    });
-                } else if (mediaType === 'photo') {
-                    // Ensure a file is uploaded for photos
-                    if (!mediaFile) {
-                        throw createError(400, 'Photo file is required to post Photo!');
-                    }
-
-                    // Create a FormData instance for photo
-                    const formData = new FormData();
-                    formData.append('message', message);
-                    formData.append('file', mediaFile.buffer, { filename: mediaFile.originalname });
-
-                    const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/photos?access_token=${pageAccessToken}`;
-
-                    // Make the API call for photo uploads
-                    response = await axios.post(facebookUrl, formData, {
-                        headers: {
-                            ...formData.getHeaders(),
-                        },
-                    });
-                } else if (mediaType === 'text') {
-                    // Ensure message or link is provided for text posts
-                    if (!message && !link) {
-                        throw createError(400, 'Message or Link field is required to post!');
-                    }
-
-                    const facebookUrl = `https://graph.facebook.com/v21.0/${pageId}/feed?access_token=${pageAccessToken}`;
-
-                    // Make the API call for text posting
-                    response = await axios.post(facebookUrl, {
-                        message,
-                        link,
-                    });
-                } else {
-                    throw createError(400, 'Invalid media type!');
-                }
-
-                // Collect successful result
-                results.push({
-                    pageId,
-                    status: 'success',
-                    data: response.data,
-                });
-            } catch (err) {
-                // Immediately throw the error if any page post fails, stopping further actions
-                throw createError(500, `${err.message}`);
-                // throw createError(500, `Error posting to page ${pageId}: ${err.message}`); // for debigging
-            }
-        }
-
-        // Send success response if all posts are successful
-        successResponse(res, {
-            status: 200,
-            message: 'Posting completed successfully',
-            payload: { results },
-        });
-    } catch (err) {
-        next(err); // Pass error to error-handling middleware
-    }
-}

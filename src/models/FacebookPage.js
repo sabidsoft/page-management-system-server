@@ -25,6 +25,16 @@ const FacebookPageSchema = new Schema({
         type: String,
         required: true,
     },
+
+    detachmentName: {
+        type: String,
+        required: true,
+    },
+
+    districtName: {
+        type: String,
+        required: true,
+    },
 }, { timestamps: true });
 
 // FacebookPage model

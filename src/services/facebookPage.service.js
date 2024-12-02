@@ -10,6 +10,8 @@ exports.upsertFacebookPageService = async (pageData) => {
                 pageCategory: pageData.pageCategory,
                 pageProfilePicture: pageData.pageProfilePicture,
                 pageAccessToken: pageData.pageAccessToken,
+                detachmentName: pageData.detachmentName,
+                districtName: pageData.districtName
             }
         },
         { new: true, upsert: true } // Return the updated document and create if not found
@@ -23,5 +25,17 @@ exports.findFacebookPageById = async (pageId) => {
 
 exports.getFacebookPagesService = async () => {
     const facebookPages = await FacebookPage.find({});
+    return facebookPages;
+};
+
+exports.getPagesByFilter = async (fieldName, fieldValue) => {
+    let query = {};
+
+    if (fieldName && fieldValue) {
+        query[fieldName] = fieldValue;
+    }
+
+    const facebookPages = await FacebookPage.find(query);
+
     return facebookPages;
 };
